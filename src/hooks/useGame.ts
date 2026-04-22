@@ -23,6 +23,10 @@ interface UseGameReturn {
 const INITIAL_SCORES: Record<Player, number> = { X: 0, O: 0 }
 const AI_THINK_DELAY_MS = 400
 
+function isValidCellIndex(index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index <= 8
+}
+
 function applyMove(board: Board, index: number, player: Player): {
   nextBoard: Board
   winResult: WinResult | null
@@ -46,6 +50,15 @@ export function useGame({ gameMode, difficulty }: UseGameOptions): UseGameReturn
   // Ref to cancel AI timeout on unmount or mode change to prevent
   // state updates on an unmounted or stale component
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestBoardRef = useRef(board)
+  const latestStatusRef = useRef(status)
+  const latestPlayerRef = useRef(currentPlayer)
+
+  useEffect(() => {
+    latestBoardRef.current = board
+    latestStatusRef.current = status
+    latestPlayerRef.current = currentPlayer
+  }, [board, status, currentPlayer])
 
   // Reset board (not scores) when mode or difficulty changes to avoid
   // mid-game inconsistency (e.g. switching from PvP to PvC mid-game)
@@ -71,18 +84,32 @@ export function useGame({ gameMode, difficulty }: UseGameOptions): UseGameReturn
     if (currentPlayer !== 'O') return
     if (status !== 'playing') return
 
+    if (aiTimeoutRef.current) {
+      clearTimeout(aiTimeoutRef.current)
+      aiTimeoutRef.current = null
+    }
+
     setIsAiThinking(true)
 
     aiTimeoutRef.current = setTimeout(() => {
-      const moveIndex = difficulty === 'hard' ? getBestMove(board) : getEasyMove(board)
+      aiTimeoutRef.current = null
 
-      // Guard: AI found no valid move (board full or already won — should not happen, but be safe)
-      if (moveIndex === null) {
+      // Re-check state at execution time to avoid stale-closure moves.
+      if (latestStatusRef.current !== 'playing' || latestPlayerRef.current !== 'O') {
         setIsAiThinking(false)
         return
       }
 
-      const { nextBoard, winResult: result, isDraw } = applyMove(board, moveIndex, 'O')
+      const currentBoard = latestBoardRef.current
+      const moveIndex = difficulty === 'hard' ? getBestMove(currentBoard) : getEasyMove(currentBoard)
+
+      // Guard: AI found no valid move (board full or already won — should not happen, but be safe)
+      if (moveIndex === null || !isValidCellIndex(moveIndex) || currentBoard[moveIndex] !== null) {
+        setIsAiThinking(false)
+        return
+      }
+
+      const { nextBoard, winResult: result, isDraw } = applyMove(currentBoard, moveIndex, 'O')
 
       setIsAiThinking(false)
       setBoard(nextBoard)
@@ -97,10 +124,11 @@ export function useGame({ gameMode, difficulty }: UseGameOptions): UseGameReturn
         setCurrentPlayer('X')
       }
     }, AI_THINK_DELAY_MS)
-  }, [board, currentPlayer, status, gameMode, difficulty])
+  }, [currentPlayer, status, gameMode, difficulty])
 
   const handleCellClick = useCallback(
     (index: number) => {
+      if (!isValidCellIndex(index)) return
       // Guard: ignore if cell is filled, game is over, or AI is thinking
       if (board[index] !== null || status !== 'playing' || isAiThinking) return
       // Guard: in PvC mode, only human (X) can click

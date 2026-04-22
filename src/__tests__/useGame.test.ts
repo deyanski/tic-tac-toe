@@ -74,6 +74,18 @@ describe('useGame — PvP mode', () => {
     expect(result.current.scores).toEqual({ X: 0, O: 0 })
     expect(result.current.status).toBe('playing')
   })
+
+  it('ignores invalid indexes (negative, out-of-range, non-integer)', () => {
+    const { result } = renderHook(() => useGame(PVP))
+    const originalBoard = [...result.current.board]
+
+    act(() => result.current.handleCellClick(-1))
+    act(() => result.current.handleCellClick(9))
+    act(() => result.current.handleCellClick(1.5))
+
+    expect(result.current.board).toEqual(originalBoard)
+    expect(result.current.currentPlayer).toBe('X')
+  })
 })
 
 describe('useGame — PvC mode', () => {
@@ -126,6 +138,36 @@ describe('useGame — PvC mode', () => {
     act(() => result.current.handleCellClick(0))
     expect(result.current.isAiThinking).toBe(true)
     act(() => result.current.resetBoard())
+    expect(result.current.isAiThinking).toBe(false)
+  })
+
+  it('does not apply a stale AI move after resetBoard while timer is pending', () => {
+    const { result } = renderHook(() => useGame(PVC_HARD))
+    act(() => result.current.handleCellClick(4))
+    expect(result.current.isAiThinking).toBe(true)
+
+    act(() => result.current.resetBoard())
+    act(() => vi.advanceTimersByTime(400))
+
+    expect(result.current.board.every((c) => c === null)).toBe(true)
+    expect(result.current.currentPlayer).toBe('X')
+    expect(result.current.isAiThinking).toBe(false)
+  })
+
+  it('does not apply a stale AI move after mode switch to PvP', () => {
+    const { result, rerender } = renderHook(
+      (props: { gameMode: 'pvp' | 'pvc'; difficulty: 'hard' }) => useGame(props),
+      { initialProps: { gameMode: 'pvc', difficulty: 'hard' } },
+    )
+
+    act(() => result.current.handleCellClick(4))
+    expect(result.current.isAiThinking).toBe(true)
+
+    rerender({ gameMode: 'pvp', difficulty: 'hard' })
+    act(() => vi.advanceTimersByTime(400))
+
+    expect(result.current.board.every((c) => c === null)).toBe(true)
+    expect(result.current.currentPlayer).toBe('X')
     expect(result.current.isAiThinking).toBe(false)
   })
 })
