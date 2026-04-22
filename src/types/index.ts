@@ -6,6 +6,8 @@ export type Board = [
   CellValue, CellValue, CellValue,
 ]
 export type GameStatus = 'playing' | 'winner' | 'draw'
+export type GameMode = 'pvp' | 'pvc'
+export type Difficulty = 'easy' | 'hard'
 
 export interface WinResult {
   winner: Player

@@ -1,11 +1,17 @@
+import { useState } from 'react'
 import { Board } from './components/Board'
 import { GameInfo } from './components/GameInfo'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useGame } from './hooks/useGame'
 import { useTheme } from './hooks/useTheme'
+import type { Difficulty, GameMode } from './types'
 
 function App() {
-  const { board, currentPlayer, status, winResult, scores, handleCellClick, resetBoard, resetAll } = useGame()
+  const [gameMode, setGameMode] = useState<GameMode>('pvp')
+  const [difficulty, setDifficulty] = useState<Difficulty>('hard')
+
+  const { board, currentPlayer, status, winResult, scores, isAiThinking, handleCellClick, resetBoard, resetAll } =
+    useGame({ gameMode, difficulty })
   const { theme, toggleTheme } = useTheme()
 
   return (
@@ -35,8 +41,13 @@ function App() {
           status={status}
           winner={winResult?.winner ?? null}
           scores={scores}
+          isAiThinking={isAiThinking}
+          gameMode={gameMode}
+          difficulty={difficulty}
           onReset={resetBoard}
           onResetAll={resetAll}
+          onGameModeChange={setGameMode}
+          onDifficultyChange={setDifficulty}
         />
       </div>
     </div>
@@ -44,4 +55,3 @@ function App() {
 }
 
 export default App
-
